@@ -1,0 +1,27 @@
+name: wayback-verify
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/wayback-verify.yml'
+      - 'wayback-captures.txt'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: HEAD each reported capture URL
+        run: |
+          set -u
+          while IFS= read -r u; do
+            [ -z "$u" ] && continue
+            for attempt in 1 2 3 4; do
+              code=$(curl -s -m 60 -o /dev/null -w '%{http_code}' -L "$u") || code=000
+              echo "CAPTURE $u attempt $attempt HTTP $code"
+              if [ "$code" = "200" ]; then break; fi
+              sleep $((attempt * 15))
+            done
+            sleep 5
+          done < wayback-captures.txt
