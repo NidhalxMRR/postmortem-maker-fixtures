@@ -1,0 +1,31 @@
+name: wayback-probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/wayback-probe.yml'
+      - 'wayback-targets.txt'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query Wayback CDX for each target
+        run: |
+          set -u
+          mkdir -p out
+          while IFS= read -r t; do
+            [ -z "$t" ] && continue
+            enc=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$t")
+            echo "=== TARGET $t"
+            code=$(curl -s -m 40 -o "out/cdx.json" -w '%{http_code}' \
+              "https://web.archive.org/cdx/search/cdx?url=${enc}&output=json&limit=3&filter=statuscode:200")
+            echo "HTTP $code"
+            head -c 600 out/cdx.json
+            echo
+            sleep 4
+          done < wayback-targets.txt
+      - name: Egress IP for the record
+        run: curl -s -m 20 https://api.ipify.org; echo
