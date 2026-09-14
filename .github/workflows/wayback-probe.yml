@@ -20,12 +20,16 @@ jobs:
             [ -z "$t" ] && continue
             enc=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$t")
             echo "=== TARGET $t"
-            code=$(curl -s -m 40 -o "out/cdx.json" -w '%{http_code}' \
-              "https://web.archive.org/cdx/search/cdx?url=${enc}&output=json&limit=3&filter=statuscode:200")
-            echo "HTTP $code"
-            head -c 600 out/cdx.json
+            for attempt in 1 2 3 4 5; do
+              code=$(curl -s -m 60 -o "out/cdx.json" -w '%{http_code}' \
+                "https://web.archive.org/cdx/search/cdx?url=${enc}&output=json&limit=2&filter=statuscode:200") || code=000
+              echo "attempt $attempt HTTP $code"
+              if [ "$code" = "200" ]; then break; fi
+              sleep $((attempt * 12))
+            done
+            head -c 700 out/cdx.json
             echo
-            sleep 4
+            sleep 6
           done < wayback-targets.txt
       - name: Egress IP for the record
         run: curl -s -m 20 https://api.ipify.org; echo
